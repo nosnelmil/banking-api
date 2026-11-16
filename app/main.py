@@ -9,7 +9,9 @@ import uuid
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi import HTTPException
 
+import psycopg2
 
 
 app = FastAPI(title="Accounts API")
@@ -19,14 +21,23 @@ accounts_db = []  # temporary in-memory list — replaced with Postgres in Modul
 @app.post("/accounts")
 def create_account(account: Account):
     conn = get_connection()
-    cur = conn.cursor()  # a cursor runs SQL commands over the connection
-    cur.execute(
-        "INSERT INTO accounts (id, owner_name, balance) VALUES (%s, %s, %s)",  # %s placeholders prevent SQL injection
-        (account.id, account.owner_name, account.balance),
-    )
-    conn.commit()  # actually save the change — without this, nothing persists
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO accounts (id, owner_name, balance) VALUES (%s, %s, %s)",
+            (account.id, account.owner_name, account.balance),
+        )
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        conn.close()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Account with id {account.id} already exists",
+        )
     conn.close()
     return account
+
  
 
 #replace old get_account method with below one
@@ -76,3 +87,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": "request_error",
+            "message": exc.detail,
+            "trace_id": request.state.trace_id,
+        },
+    )
