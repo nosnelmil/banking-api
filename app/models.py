@@ -1,6 +1,6 @@
-from pydantic import BaseModel  # import the class our data templates are built from
+from pydantic import BaseModel, Field
  
-class Account(BaseModel):  # this defines the 'shape' of an Account
-    id: str  # every account must have a text ID
-    owner_name: str  # the name of the account holder
-    balance: float  # the account balance, as a decimal number
+class Account(BaseModel):
+    id: str
+    owner_name: str = Field(min_length=1)
+    balance: float = Field(ge=0)  # must be zero or greater
