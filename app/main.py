@@ -414,6 +414,11 @@ async def verify_account(account_id: str):
         "processing_time_seconds": round(elapsed_time, 2)
     }
 
+@app.get("/health")
+def health():
+    print("Health endpoint called")
+    return {"status": "OK"}
+
 
 
 app.include_router(v1)
