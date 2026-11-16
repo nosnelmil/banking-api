@@ -37,6 +37,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
+@app.get("/accounts")
+def get_accounts(user=Depends(verify_token)):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, owner_name, balance FROM accounts"
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row[0],
+            "owner_name": row[1],
+            "balance": float(row[2]),
+        }
+        for row in rows
+    ]
+
+
 @app.post(
     "/accounts",
     status_code=201,
@@ -100,3 +119,5 @@ def liveness():
 @app.get("/health/ready")
 def readiness():
     return {"status": "ready"}
+
+
