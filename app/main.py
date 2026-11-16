@@ -8,6 +8,9 @@ import uuid
  
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+
+
 
 app = FastAPI(title="Accounts API")
 accounts_db = []  # temporary in-memory list — replaced with Postgres in Module 5
@@ -41,12 +44,14 @@ def get_account(account_id: str):
         raise HTTPException(status_code=404, detail="Account not found")
     return {"id": row[0], "owner_name": row[1], "balance": row[2]}
 
+
 @app.middleware("http")
 async def add_trace_id(request: Request, call_next):
     request.state.trace_id = str(uuid.uuid4())
     response = await call_next(request)
     response.headers["X-Trace-Id"] = request.state.trace_id
     return response
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -58,3 +63,16 @@ async def global_exception_handler(request: Request, exc: Exception):
             "trace_id": request.state.trace_id,
         },
     )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "validation_error",
+            "message": exc.errors()[0]["msg"],
+            "trace_id": request.state.trace_id,
+        },
+    )
+
