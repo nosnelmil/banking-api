@@ -5,10 +5,16 @@ info:
 paths:
   /accounts:
     post:
-      summary: Create a new account
       responses:
-        '201':
+        '201':  # already had this
           description: Account created
+        '400':  # NEW
+          description: Validation error
+          headers:
+            X-Trace-Id:  # NEW
+              description: Unique ID for this request
+              schema:
+                type: string
   /accounts/{account_id}:
     get:
       responses:
@@ -16,3 +22,6 @@ paths:
           description: Account found
         '404':
           description: Account not found
+        '401':  # NEW
+          description: Authentication required
+

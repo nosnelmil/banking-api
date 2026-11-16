@@ -37,7 +37,31 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
-@app.post("/accounts")
+@app.post(
+    "/accounts",
+    status_code=201,
+    responses={
+        400: {
+            "description": "Validation error",
+            "headers": {
+                "X-Trace-Id": {
+                    "description": "Unique ID for this request",
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+        401: {"description": "Authentication required"},
+        409: {
+            "description": "Account already exists",
+            "headers": {
+                "X-Trace-Id": {
+                    "description": "Unique ID for this request",
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+    },
+)
 def create_account(account: Account, user=Depends(verify_token)):
     conn = get_connection()
     cur = conn.cursor()
@@ -49,7 +73,13 @@ def create_account(account: Account, user=Depends(verify_token)):
     conn.close()
     return account
 
-@app.get("/accounts/{account_id}")
+@app.get(
+    "/accounts/{account_id}",
+    responses={
+        401: {"description": "Authentication required"},
+        404: {"description": "Account not found"},
+    },
+)
 def get_account(account_id: str, user=Depends(verify_token)):
     conn = get_connection()
     cur = conn.cursor()
