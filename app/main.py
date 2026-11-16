@@ -15,8 +15,7 @@ from app.models import (
 )
 from app.db import get_connection   # your existing DB session dependency
 import logging
-logger = logging.getLogger("uvicorn.error")
-
+import time
 
 from app.auth import verify_token
 from fastapi.exceptions import RequestValidationError
@@ -24,7 +23,14 @@ from psycopg2 import IntegrityError
 
 import asyncio
 
-logger = logging.getLogger("uvicorn.error")
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+ 
+logger = logging.getLogger(__name__)
+
 
 
 v1 = APIRouter(prefix="/v1")
@@ -376,6 +382,9 @@ def readiness(conn = Depends(get_connection)):
 
 @app.post("/accounts/{account_id}/verify")
 async def verify_account(account_id: str):
+    start_time = time.perf_counter()
+    logger.info(f"START verification for account {account_id}")
+
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
@@ -384,17 +393,27 @@ async def verify_account(account_id: str):
     )
     row = cur.fetchone()
     conn.close()
+
     if not row:
-        raise HTTPException(
-            status_code=404,
-            detail="Account not found"
-        )
+        logger.warning(f"Account {account_id} not found")
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    logger.info(f"Account {account_id} found. Calling external KYC service...")
     # Simulate a slow external verification/KYC service
     await asyncio.sleep(2)
+    logger.info(f"KYC verification completed for account {account_id}")
+
+    elapsed_time = time.perf_counter() - start_time
+    logger.info(
+        f"END verification for account {account_id} "
+        f"| Total time: {elapsed_time:.2f} seconds"
+    )
     return {
         "account_id": account_id,
-        "verified": True
+        "verified": True,
+        "processing_time_seconds": round(elapsed_time, 2)
     }
+
 
 
 app.include_router(v1)
