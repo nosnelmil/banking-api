@@ -29,7 +29,7 @@ class Currency(str, Enum):
     EUR = "EUR"
  
 class Account(BaseModel):
-    id: str = Field(pattern=r"^[A-Za-z0-9]{4,12}$")
+    id: str = Field(pattern=r"^[A-Za-z0-9-]{4,13}$")
     owner_name: str = Field(min_length=5, max_length=50 )
     balance: float = Field(ge=0)  # must be zero or greater
     status: AccountStatus = AccountStatus.ACTIVE
