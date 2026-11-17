@@ -1,0 +1,354 @@
+openapi: 3.1.0
+info:
+  title: Accounts API
+  version: 0.1.0
+paths:
+  /accounts:
+    post:
+      summary: Create Account
+      operationId: create_account_accounts_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '400':
+          description: Validation error
+          headers:
+            X-Trace-Id:
+              description: Unique ID for this request
+              schema:
+                type: string
+        '401':
+          description: Authentication required
+        '409':
+          description: Account already exists
+          headers:
+            X-Trace-Id:
+              description: Unique ID for this request
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /accounts/{account_id}:
+    get:
+      summary: Get Account
+      operationId: get_account_accounts__account_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Account Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Authentication required
+        '404':
+          description: Account not found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/accounts/{account_id}:
+    patch:
+      summary: Update Account
+      operationId: update_account_v1_accounts__account_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Account Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /accounts/bulk:
+    post:
+      summary: Create Accounts Bulk
+      operationId: create_accounts_bulk_accounts_bulk_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              items:
+                $ref: '#/components/schemas/Account'
+              type: array
+              title: Accounts
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '400':
+          description: Empty list
+        '401':
+          description: Authentication required
+        '409':
+          description: One or more accounts already exist
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /health/live:
+    get:
+      summary: Liveness
+      operationId: liveness_health_live_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /health/ready:
+    get:
+      summary: Readiness
+      operationId: readiness_health_ready_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /accounts/{account_id}/verify:
+    post:
+      summary: Verify Account
+      operationId: verify_account_accounts__account_id__verify_post
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Account Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v1/accounts:
+    get:
+      summary: Get Accounts
+      operationId: get_accounts_v1_accounts_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/Currency'
+          - type: 'null'
+          title: Currency
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 10
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/accounts:
+    get:
+      summary: Get Accounts V2
+      operationId: get_accounts_v2_v2_accounts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+      security:
+      - HTTPBearer: []
+components:
+  schemas:
+    Account:
+      properties:
+        id:
+          type: string
+          title: Id
+        owner_name:
+          type: string
+          minLength: 1
+          title: Owner Name
+        balance:
+          type: number
+          minimum: 0.0
+          title: Balance
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+          default: ACTIVE
+        account_type:
+          $ref: '#/components/schemas/AccountType'
+          default: SAVINGS
+        currency:
+          $ref: '#/components/schemas/Currency'
+          default: INR
+      type: object
+      required:
+      - id
+      - owner_name
+      - balance
+      title: Account
+    AccountStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - FROZEN
+      - CLOSED
+      title: AccountStatus
+    AccountType:
+      type: string
+      enum:
+      - SAVINGS
+      - CHECKING
+      title: AccountType
+    AccountUpdate:
+      properties:
+        balance:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+          title: Balance
+        status:
+          anyOf:
+          - $ref: '#/components/schemas/AccountStatus'
+          - type: 'null'
+        account_type:
+          anyOf:
+          - $ref: '#/components/schemas/AccountType'
+          - type: 'null'
+      type: object
+      title: AccountUpdate
+    Currency:
+      type: string
+      enum:
+      - INR
+      - USD
+      - EUR
+      title: Currency
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
