@@ -482,11 +482,13 @@ def update_account_status(
     request_fingerprint = f"{account_id}:{new_status.value}"
 
     if idempotency_key in idempotency_cache:
+        logger.info("Returning cached response")
         cached = idempotency_cache[idempotency_key]
         if cached["request_fingerprint"] != request_fingerprint:
             raise HTTPException(status_code=409, detail="Idempotency-Key already used with different request data")
         return cached["result"]
 
+    logger.info("Updating database")
     conn = get_connection()
     cur = conn.cursor()
 
@@ -512,6 +514,59 @@ def update_account_status(
     finally:
         cur.close()
         conn.close()
+
+@app.delete("/accounts/{account_id}")
+def delete_account(
+    account_id: str,
+    idempotency_key: str = Header(...)
+):
+    request_fingerprint = f"delete:{account_id}"
+ 
+    if idempotency_key in idempotency_cache:
+        cached = idempotency_cache[idempotency_key]
+        if cached["request_fingerprint"] != request_fingerprint:
+            raise HTTPException(
+                status_code=409,
+                detail="Idempotency-Key already used with different request data"
+            )
+        return cached["result"]
+ 
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT status FROM accounts WHERE id = %s", (account_id,))
+    row = cur.fetchone()
+ 
+    if row is None:
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="Account not found")
+ 
+    if row[0] == "Closed":
+        cur.close()
+        conn.close()
+        result = {"account_id": account_id, "status": "Closed", "already_closed": True}
+        idempotency_cache[idempotency_key] = {
+            "request_fingerprint": request_fingerprint,
+            "result": result
+        }
+        return result
+ 
+    cur.execute(
+        "UPDATE accounts SET status = 'Closed' WHERE id = %s",
+        (account_id,)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+ 
+    result = {"account_id": account_id, "status": "Closed", "already_closed": False}
+    idempotency_cache[idempotency_key] = {
+        "request_fingerprint": request_fingerprint,
+        "result": result
+    }
+    return result
+
+
 
 app.include_router(v1)
 app.include_router(v2)
