@@ -12,6 +12,7 @@ from app.models import (
     AccountStatus,
     AccountType,
     Currency,
+    BalanceUpdate,
 )
 from app.db import get_connection   # your existing DB session dependency
 import logging
@@ -68,6 +69,9 @@ async def add_trace_id(request: Request, call_next):
     request.state.trace_id = str(uuid.uuid4())
     response = await call_next(request)
     response.headers["X-Trace-Id"] = request.state.trace_id
+    logger.info("trace_id=%s %s %s -> %s",
+            request.state.trace_id, request.method,
+            request.url.path, response.status_code)
     return response
  
 @app.exception_handler(Exception)
@@ -225,14 +229,19 @@ def get_account(account_id: str, user=Depends(verify_token)):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, owner_name, balance FROM accounts WHERE id = %s",
+        "SELECT id, owner_name, balance, status FROM accounts WHERE id = %s",
         (account_id,),
     )
     row = cur.fetchone()
     conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
-    return {"id": row[0], "owner_name": row[1], "balance": float(row[2])}
+    return {
+        "id": row[0],
+        "owner_name": row[1],
+        "balance": float(row[2]),
+        "status": row[3],
+    }
 
 @app.patch("/v1/accounts/{account_id}")
 def update_account(
@@ -322,6 +331,83 @@ def update_account(
     finally:
         cur.close()
         conn.close()
+
+@app.patch("/accounts/{account_id}/balance")
+def update_account_balance(
+    account_id: str,
+    request: BalanceUpdate,
+    user=Depends(verify_token),
+):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        if request.type == "deposit":
+            cur.execute(
+                """
+                UPDATE accounts
+                SET balance = balance + %s
+                WHERE id = %s
+                  AND LOWER(status) = 'active'
+                RETURNING id, balance, status
+                """,
+                (request.amount, account_id)
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE accounts
+                SET balance = balance - %s
+                WHERE id = %s
+                  AND LOWER(status) = 'active'
+                  AND balance >= %s
+                RETURNING id, balance, status
+                """,
+                (request.amount, account_id, request.amount)
+            )
+
+        row = cur.fetchone()
+
+        if row is None:
+            conn.rollback()
+
+            cur.execute(
+                "SELECT status FROM accounts WHERE id = %s",
+                (account_id,)
+            )
+            account = cur.fetchone()
+
+            if account is None:
+                raise HTTPException(404, "Account not found")
+
+            if account[0].lower() != "active":
+                raise HTTPException(409, "Account is not active")
+
+            raise HTTPException(422, "Insufficient funds")
+
+        conn.commit()
+
+        return {
+            "account_id": row[0],
+            "balance": str(row[1]),
+            "status": row[2]
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update account balance"
+        )
+
+    finally:
+        cur.close()
+        conn.close()
+
 
 @app.post(
     "/accounts/bulk",

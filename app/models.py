@@ -1,6 +1,11 @@
 from enum import Enum
 from typing import Optional
- 
+
+
+from decimal import Decimal
+from typing import Literal
+
+
 from pydantic import BaseModel, Field
  
  
@@ -48,4 +53,9 @@ class AccountUpdate(BaseModel):
  
 class AccountStatusUpdate(BaseModel):
     status: AccountStatus
+
+
+class BalanceUpdate(BaseModel):
+    type: Literal["deposit", "withdrawal"]
+    amount: Decimal = Field(gt=0)
 

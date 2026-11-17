@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: Transactions API
+  version: "1.0.0"
+paths:
+  /transactions:
+    post:
+      responses:
+        '201':
+          description: Transaction created
+        '400':
+          description: Validation error
+        '404':
+          description: Account not found
+        '409':
+          description: Account is not active
+        '422':
+          description: Insufficient funds for withdrawal
+        '503':
+          description: Accounts service unavailable
+  /transactions/{transaction_id}:
+    get:
+      responses:
+        '200':
+          description: Transaction found
+        '401':
+          description: Authentication required
+        '404':
+          description: Transaction not found
