@@ -171,23 +171,32 @@ def get_accounts_v2(user=Depends(verify_token)):
 def create_account(account: Account, user=Depends(verify_token)):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO accounts
-        (id, owner_name, balance, status, account_type, currency)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """,
-        (
-            account.id,
-            account.owner_name,
-            account.balance,
-            account.status.value,
-            account.account_type.value,
-            account.currency.value,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        cur.execute(
+            """
+            INSERT INTO accounts
+            (id, owner_name, balance, status, account_type, currency)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                account.id,
+                account.owner_name,
+                account.balance,
+                account.status.value,
+                account.account_type.value,
+                account.currency.value,
+            ),
+        )
+        conn.commit()
+    except IntegrityError:
+        conn.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Account with id {account.id} already exists",
+        )
+    finally:
+        cur.close()
+        conn.close()
     return account
 
 @app.get(

@@ -1,0 +1,57 @@
+### ============================
+### ACCOUNTS CRUD (Module 5–7)
+### ============================
+
+### ============================
+### VARIABLES
+### ============================
+
+@linux_vm_ip = 100.48.16.213
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyaWNoYSJ9.3KtM4et7OksbmSJqIA7r0d2hJtRv647HqkawMKpGlYc
+@account_id = 1
+
+### ============================
+### ACCOUNTS CRUD (Module 5–7)
+### ============================
+
+### 1. Create account
+POST http://{{linux_vm_ip}}:8001/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "id": "a1",
+    "owner_name": "Richa",
+    "balance": 100.0
+}
+
+###
+
+### 2. Get account
+GET http://{{linux_vm_ip}}:8001/accounts/{{account_id}}
+Authorization: Bearer {{token}}
+
+###
+
+### ============================
+### AUTH (Module 7)
+### ============================
+
+### 3. Missing token — expect 401
+GET http://{{linux_vm_ip}}:8001/accounts/a1
+
+###
+
+### ============================
+### VERSIONING & DEPRECATION (Module 12)
+### ============================
+
+### 4. V1 — expect Deprecation + Sunset headers
+GET http://{{linux_vm_ip}}:8001/v1/accounts
+Authorization: Bearer {{token}}
+
+###
+
+### 5. V2 — expect account_tier field on each account
+GET http://{{linux_vm_ip}}:8001/v2/accounts
+Authorization: Bearer {{token}}
