@@ -1,5 +1,5 @@
 from typing import List
-from datetime import date  
+from datetime import date, datetime, timezone  
 from psycopg2.extras import execute_values
 from fastapi import FastAPI, HTTPException, Request, Depends, Query, APIRouter, Header
 from fastapi.responses import JSONResponse, Response
@@ -528,6 +528,30 @@ async def verify_account(account_id: str):
 def health():
     print("Health endpoint called")
     return {"status": "OK"}
+
+
+@app.get(
+    "/me",
+    responses={401: {"description": "Authentication required"}},
+)
+def get_me(user=Depends(verify_token)):
+    exp = user.get("exp")
+
+    if exp is None:
+        return {
+            "username": user.get("sub"),
+            "token_expires_at": "no expiry",
+            "seconds_left": None,
+        }
+
+    expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+    seconds_left = int((expires_at - datetime.now(timezone.utc)).total_seconds())
+
+    return {
+        "username": user.get("sub"),
+        "token_expires_at": expires_at.isoformat(),
+        "seconds_left": seconds_left,
+    }
 
 
 @app.middleware("http")
