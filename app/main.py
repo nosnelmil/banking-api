@@ -2,7 +2,7 @@ from typing import List
 from datetime import date  
 from psycopg2.extras import execute_values
 from fastapi import FastAPI, HTTPException, Request, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import uuid
 from fastapi import APIRouter
 from app.models import (
@@ -22,6 +22,21 @@ from fastapi.exceptions import RequestValidationError
 from psycopg2 import IntegrityError
 
 import asyncio
+
+from prometheus_client import Counter, Histogram, generate_latest
+
+REQUEST_COUNT = Counter(
+    "api_requests_total",
+    "Total API Requests",
+    ["method", "path", "status_code"]
+)
+
+REQUEST_LATENCY = Histogram(
+    "api_request_duration_seconds",
+    "Request duration in seconds",
+    ["method", "path"]
+)
+
 
 # Configure logging
 logging.basicConfig(
@@ -427,6 +442,36 @@ async def verify_account(account_id: str):
 def health():
     print("Health endpoint called")
     return {"status": "OK"}
+
+
+@app.middleware("http")
+async def count_requests(request, call_next):
+    if request.url.path == "/metrics":
+        return await call_next(request)  # don't let metrics-viewing count as traffic
+
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start_time
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+    ).inc()
+
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        path=request.url.path,
+    ).observe(duration)
+
+    return response
+
+@app.get("/metrics")
+def metrics():
+    return Response(
+        generate_latest(),
+        media_type="text/plain"
+    )
 
 
 
