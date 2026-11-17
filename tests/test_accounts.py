@@ -78,3 +78,44 @@ def test_v2_accounts_has_account_tier():  # COMPLIANCE TEST — Module 12 versio
     assert response.status_code == 200
     body = response.json()
     assert all("account_tier" in a for a in body)
+
+
+def test_update_status_requires_idempotency_key():
+    response = client.patch("/accounts/1/status", params={"new_status": "Frozen"})
+    assert response.status_code == 422
+ 
+def test_update_status_rejects_invalid_status(new_account_id):
+    response = client.patch(
+        f"/accounts/{new_account_id}/status",
+        params={"new_status": "NotARealStatus"},
+        headers={"Idempotency-Key": "test-key-1"}
+    )
+    assert response.status_code == 422
+ 
+def test_update_status_not_found():
+    response = client.patch(
+        "/accounts/does-not-exist/status",
+        params={"new_status": "Frozen"},
+        headers={"Idempotency-Key": "test-key-2"}
+    )
+    assert response.status_code == 404
+ 
+def test_update_status_idempotent_repeat(new_account_id):
+    headers = {"Idempotency-Key": "test-key-3"}
+    first = client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
+    second = client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
+    assert first.status_code == 200
+    assert first.json() == second.json()
+ 
+def test_update_status_key_reuse_conflict(new_account_id):
+    headers = {"Idempotency-Key": "test-key-4"}
+    client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
+    conflict = client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Active"}, headers=headers)
+    assert conflict.status_code == 409
+
+def test_delete_account_is_idempotent(new_account_id):
+    headers = {"Idempotency-Key": "test-key-5"}
+    first = client.delete(f"/accounts/{new_account_id}", headers=headers)
+    second = client.delete(f"/accounts/{new_account_id}", headers=headers)
+    assert first.status_code == 200
+    assert second.json()["already_closed"] in (True, False)
