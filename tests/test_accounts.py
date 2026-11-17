@@ -27,6 +27,18 @@ def new_account_id():
     conn.close()
  
  
+@pytest.fixture
+def existing_account_id(new_account_id):
+    # Creates a real account for tests that need one to already exist.
+    response = client.post(
+        "/accounts",
+        headers=HEADERS,
+        json={"id": new_account_id, "owner_name": "Test User", "balance": 50.0},
+    )
+    assert response.status_code == 201
+    return new_account_id
+ 
+ 
 def test_create_account_compliance(new_account_id):  # COMPLIANCE TEST
     response = client.post(
         "/accounts",
@@ -100,22 +112,22 @@ def test_update_status_not_found():
     )
     assert response.status_code == 404
  
-def test_update_status_idempotent_repeat(new_account_id):
+def test_update_status_idempotent_repeat(existing_account_id):
     headers = {"Idempotency-Key": "test-key-3"}
-    first = client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
-    second = client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
+    first = client.patch(f"/accounts/{existing_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
+    second = client.patch(f"/accounts/{existing_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
     assert first.status_code == 200
     assert first.json() == second.json()
  
-def test_update_status_key_reuse_conflict(new_account_id):
+def test_update_status_key_reuse_conflict(existing_account_id):
     headers = {"Idempotency-Key": "test-key-4"}
-    client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
-    conflict = client.patch(f"/accounts/{new_account_id}/status", params={"new_status": "Active"}, headers=headers)
+    client.patch(f"/accounts/{existing_account_id}/status", params={"new_status": "Frozen"}, headers=headers)
+    conflict = client.patch(f"/accounts/{existing_account_id}/status", params={"new_status": "Active"}, headers=headers)
     assert conflict.status_code == 409
 
-def test_delete_account_is_idempotent(new_account_id):
+def test_delete_account_is_idempotent(existing_account_id):
     headers = {"Idempotency-Key": "test-key-5"}
-    first = client.delete(f"/accounts/{new_account_id}", headers=headers)
-    second = client.delete(f"/accounts/{new_account_id}", headers=headers)
+    first = client.delete(f"/accounts/{existing_account_id}", headers=headers)
+    second = client.delete(f"/accounts/{existing_account_id}", headers=headers)
     assert first.status_code == 200
     assert second.json()["already_closed"] in (True, False)

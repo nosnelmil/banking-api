@@ -8,6 +8,14 @@ class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"
     FROZEN = "FROZEN"
     CLOSED = "CLOSED"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            for member in cls:
+                if member.value.lower() == value.lower():
+                    return member
+        return None
  
  
 class AccountType(str, Enum):
@@ -21,7 +29,7 @@ class Currency(str, Enum):
     EUR = "EUR"
  
 class Account(BaseModel):
-    id: str = Field(pattern=r'"^[A-Za-z0-9] {4,12}$')
+    id: str = Field(pattern=r"^[A-Za-z0-9]{4,12}$")
     owner_name: str = Field(min_length=5, max_length=50 )
     balance: float = Field(ge=0)  # must be zero or greater
     status: AccountStatus = AccountStatus.ACTIVE
