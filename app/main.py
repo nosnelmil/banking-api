@@ -1,7 +1,7 @@
 from typing import List
 from datetime import date  
 from psycopg2.extras import execute_values
-from fastapi import FastAPI, HTTPException, Request, Depends, Query
+from fastapi import FastAPI, HTTPException, Request, Depends, Query, APIRouter, Header
 from fastapi.responses import JSONResponse, Response
 import uuid
 from fastapi import APIRouter
@@ -46,13 +46,13 @@ logging.basicConfig(
  
 logger = logging.getLogger(__name__)
 
-
-
 v1 = APIRouter(prefix="/v1")
 v2 = APIRouter(prefix="/v2")
 
 
 app = FastAPI(title="Accounts API")
+
+idempotency_cache = {}
 
 @app.middleware("http")
 async def add_deprecation_header(request: Request, call_next):
@@ -473,7 +473,45 @@ def metrics():
         media_type="text/plain"
     )
 
+@app.patch("/accounts/{account_id}/status")
+def update_account_status(
+    account_id: str,
+    new_status: AccountStatus,
+    idempotency_key: str = Header(...)
+):
+    request_fingerprint = f"{account_id}:{new_status.value}"
 
+    if idempotency_key in idempotency_cache:
+        cached = idempotency_cache[idempotency_key]
+        if cached["request_fingerprint"] != request_fingerprint:
+            raise HTTPException(status_code=409, detail="Idempotency-Key already used with different request data")
+        return cached["result"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT id FROM accounts WHERE id = %s", (account_id,))
+        if cur.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Account not found")
+
+        cur.execute("UPDATE accounts SET status = %s WHERE id = %s", (new_status.value, account_id))
+        conn.commit()
+
+        result = {"account_id": account_id, "status": new_status.value}
+        idempotency_cache[idempotency_key] = {"request_fingerprint": request_fingerprint, "result": result}
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update account status")
+
+    finally:
+        cur.close()
+        conn.close()
 
 app.include_router(v1)
 app.include_router(v2)

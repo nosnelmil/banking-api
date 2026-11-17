@@ -20,11 +20,10 @@ class Currency(str, Enum):
     USD = "USD"
     EUR = "EUR"
  
- 
 class Account(BaseModel):
-    id: str
-    owner_name: str = Field(min_length=1)
-    balance: float = Field(ge=0)
+    id: str = Field(pattern=r'"^[A-Za-z0-9] {4,12}$')
+    owner_name: str = Field(min_length=5, max_length=50 )
+    balance: float = Field(ge=0)  # must be zero or greater
     status: AccountStatus = AccountStatus.ACTIVE
     account_type: AccountType = AccountType.SAVINGS
     currency: Currency = Currency.INR
